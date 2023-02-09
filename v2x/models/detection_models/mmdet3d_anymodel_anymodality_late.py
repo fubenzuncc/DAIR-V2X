@@ -1,12 +1,13 @@
+import logging
 import os.path as osp
+
 import numpy as np
 import torch.nn as nn
-import logging
 
 logger = logging.getLogger(__name__)
 
-from base_model import BaseModel
-from model_utils import (
+from v2x.models.base_model import BaseModel
+from v2x.models.model_utils import (
     init_model,
     inference_detector,
     inference_mono_3d_detector,
@@ -16,19 +17,13 @@ from model_utils import (
     TimeCompensator,
     BasicFuser,
 )
-from dataset.dataset_utils import (
-    load_json,
+from v2x.dataset.dataset_utils import (
     save_pkl,
     load_pkl,
-    read_pcd,
-    read_jpg,
 )
-from v2x_utils import (
+from v2x.v2x_utils import (
     mkdir,
     get_arrow_end,
-    box_translation,
-    points_translation,
-    get_trans,
     diff_label_filt,
 )
 
@@ -44,7 +39,7 @@ def gen_pred_dict(id, timestamp, box, arrow, points, score, label):
         "arrows": arrow.tolist(),
         "scores_3d": score,
         "labels_3d": label,
-        "points": points.tolist(),
+        "points": points.tolist(),  # either image or pointcloud
     }
     return save_dict
 
@@ -56,8 +51,8 @@ def get_box_info(result):
     else:
         box_lidar = result[0]["boxes_3d"].corners.numpy()
         box_ry = result[0]["boxes_3d"].tensor[:, -1].numpy()
-    box_centers_lidar = box_lidar.mean(axis=1)
-    arrow_ends_lidar = get_arrow_end(box_centers_lidar, box_ry)
+    box_centers_lidar = box_lidar.mean(axis=1)  # (num_box, 8, 3) --> (num_box, 3)
+    arrow_ends_lidar = get_arrow_end(box_centers_lidar, box_ry)  # (num_box, 3)
     return box_lidar, box_ry, box_centers_lidar, arrow_ends_lidar
 
 
@@ -69,6 +64,14 @@ class LateFusionInf(nn.Module):
         self.pipe = pipe
 
     def pred(self, frame, trans, pred_filter):
+        '''
+        args.sensortype == 'lidar' means the input of model is only pointcloud
+        args.sensortype == 'camera' means the input of model is only image
+        :param frame:
+        :param trans:
+        :param pred_filter:
+        :return:
+        '''
         if self.args.sensortype == "lidar":
             id = frame.id["lidar"]
             logger.debug("infrastructure pointcloud_id: {}".format(id))
@@ -95,7 +98,7 @@ class LateFusionInf(nn.Module):
             tmp = osp.join(self.args.input, "infrastructure-side", frame["image_path"])
             annos = osp.join(self.args.input, "infrastructure-side", "annos", id + ".json")
             result, _ = inference_mono_3d_detector(self.model, tmp, annos)
-        box, box_ry, box_center, arrow_ends = get_box_info(result)
+        box, box_ry, box_center, arrow_ends = get_box_info(result)  # (num_box, 8, 3), (num_box, ), (num_box, 3), (num_box, 3)
 
         # Convert to other coordinate
         if trans is not None:
@@ -140,7 +143,7 @@ class LateFusionInf(nn.Module):
             id,
             frame_timestamp,
             box,
-            np.concatenate([box_center, arrow_ends], axis=1),
+            np.concatenate([box_center, arrow_ends], axis=1),  # (num_box, 3), (num_box, 3) --> (num_box, 6)
             save_data,
             result[0]["scores_3d"].tolist(),
             result[0]["labels_3d"].tolist(),
@@ -203,6 +206,14 @@ class LateFusionVeh(nn.Module):
         self.args = args
 
     def pred(self, frame, trans, pred_filter):
+        '''
+        args.sensortype == 'lidar' means the input of model is only pointcloud
+        args.sensortype == 'camera' means the input of model is only image
+        :param frame:
+        :param trans:
+        :param pred_filter: only filter box
+        :return:
+        '''
         if self.args.sensortype == "lidar":
             id = frame.id["lidar"]
             logger.debug("vehicle pointcloud_id: {}".format(id))
@@ -229,7 +240,7 @@ class LateFusionVeh(nn.Module):
             tmp = osp.join(self.args.input, "vehicle-side", frame["image_path"])
             annos = osp.join(self.args.input, "vehicle-side", "annos", id + ".json")
             result, _ = inference_mono_3d_detector(self.model, tmp, annos)
-        box, box_ry, box_center, arrow_ends = get_box_info(result)
+        box, box_ry, box_center, arrow_ends = get_box_info(result)  # (num_box, 8, 3), (num_box, ), (num_box, 3), (num_box, 3)
 
         # Convert to other coordinate
         if trans is not None:
@@ -274,7 +285,7 @@ class LateFusionVeh(nn.Module):
             id,
             frame_timestamp,
             box,
-            np.concatenate([box_center, arrow_ends], axis=1),
+            np.concatenate([box_center, arrow_ends], axis=1),  # (num_box, 3), (num_box, 3) --> (num_box, 6)
             save_data,
             result[0]["scores_3d"].tolist(),
             result[0]["labels_3d"].tolist(),

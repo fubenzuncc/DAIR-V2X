@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 from tqdm import tqdm
 import numpy as np
 
-from v2x_utils import range2box, id_to_str, Evaluator
-from config import add_arguments
-from dataset import SUPPROTED_DATASETS
-from dataset.dataset_utils import save_pkl
-from models import SUPPROTED_MODELS
-from models.model_utils import Channel
+from v2x.v2x_utils import range2box, id_to_str, Evaluator
+from v2x.config import add_arguments
+from v2x.dataset import SUPPROTED_DATASETS
+from v2x.dataset.dataset_utils import save_pkl
+from v2x.models import SUPPROTED_MODELS
+from v2x.models.model_utils import Channel
 
 
 def eval_vic(args, dataset, model, evaluator):
@@ -38,7 +38,27 @@ def eval_vic(args, dataset, model, evaluator):
             None if not hasattr(dataset, "prev_inf_frame") else dataset.prev_inf_frame,
         )
 
+        pred_tmp = {}
+        pred_tmp['boxes_3d'] = []
+        pred_tmp['labels_3d'] = []
+        pred_tmp['scores_3d'] = []
+        pred_tmp['inf_id'] = pred['inf_id']
+        pred_tmp['veh_id'] = pred['veh_id']
+        pred_tmp['inf_boxes'] = pred['inf_boxes']
+
+        for i in range(0, len(pred['labels_3d'])):
+            if pred['labels_3d'][i] == 2:
+                pred_tmp['boxes_3d'].append(pred['boxes_3d'][i])
+                pred_tmp['labels_3d'].append(pred['labels_3d'][i])
+                pred_tmp['scores_3d'].append(pred['scores_3d'][i])
+        
+        pred = pred_tmp
+
         evaluator.add_frame(pred, label)
+
+        # 计算每帧的ab_cost
+        pred["ab_cost"] = pipe.cur_bytes
+
         pipe.flush()
         pred["label"] = label["boxes_3d"]
         pred["veh_id"] = veh_id
@@ -66,6 +86,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(conflict_handler="resolve")
     add_arguments(parser)
     args, _ = parser.parse_known_args()
+    print(args)
     # add model-specific arguments
     SUPPROTED_MODELS[args.model].add_arguments(parser)
     args = parser.parse_args()

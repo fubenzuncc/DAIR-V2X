@@ -61,6 +61,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     source_root = args.source_root
     target_root = args.target_root
+    print('source_root',source_root)
+    print('target_root', target_root)
 
     print("================ Start to Copy Raw Data ================")
     mdkir_kitti(target_root)

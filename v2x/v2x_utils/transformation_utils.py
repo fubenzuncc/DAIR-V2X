@@ -39,7 +39,7 @@ def get_arrow_end(centers, angles, vector=[5, 5]):
     end = []
     for angle in angles:
         end.append([vector[0] * math.sin(angle), vector[1] * math.cos(angle), 0])
-    end = np.array(end) + centers
+    end = np.array(end) + centers # (num_box, 3) + (num_box, 1, 3)
     return end
 
 

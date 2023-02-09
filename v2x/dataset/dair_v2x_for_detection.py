@@ -1,12 +1,11 @@
-import os.path as osp
-from functools import cmp_to_key
 import logging
+import os.path as osp
 
 logger = logging.getLogger(__name__)
 
-from base_dataset import DAIRV2XDataset, get_annos, build_path_to_info
-from dataset.dataset_utils import load_json, InfFrame, VehFrame, VICFrame, Label
-from v2x_utils import Filter, RectFilter, id_cmp, id_to_str, get_trans, box_translation
+from v2x.dataset.base_dataset import DAIRV2XDataset, get_annos, build_path_to_info
+from v2x.dataset.dataset_utils import load_json, InfFrame, VehFrame, VICFrame, Label
+from v2x.v2x_utils import Filter, RectFilter, id_to_str
 
 
 class DAIRV2XI(DAIRV2XDataset):
@@ -170,6 +169,9 @@ class VICDataset(DAIRV2XDataset):
             trans_1 = vic_frame.transform("World", "Vehicle_lidar")
             label_v = Label(osp.join(path, elem["cooperative_label_path"]), filt_world)
             label_v["boxes_3d"] = trans_1(label_v["boxes_3d"])
+
+            # label_v = {}
+
             filt = RectFilter(extended_range[0])
             tup = (
                 vic_frame,
@@ -194,6 +196,8 @@ class VICDataset(DAIRV2XDataset):
             raise Exception
 
         if split in ["train", "val", "test"]:
+            # print(split_data["cooperative_split"].keys())
+            # split = "test_A"
             split_data = split_data["cooperative_split"][split]
         else:
             print("Split Method Doesn't Exists!")
@@ -250,8 +254,8 @@ class VICAsyncDataset(VICDataset):
         if sensortype == "lidar":
             cur = self.inf_path2info["infrastructure-side/velodyne/" + index + ".pcd"]
             if (
-                int(index) - self.k < int(cur["batch_start_id"])
-                or "infrastructure-side/velodyne/" + id_to_str(int(index) - self.k) + ".pcd" not in self.inf_path2info
+                    int(index) - self.k < int(cur["batch_start_id"])
+                    or "infrastructure-side/velodyne/" + id_to_str(int(index) - self.k) + ".pcd" not in self.inf_path2info
             ):
                 return None, None
             prev = self.inf_path2info["infrastructure-side/velodyne/" + id_to_str(int(index) - self.k) + ".pcd"]

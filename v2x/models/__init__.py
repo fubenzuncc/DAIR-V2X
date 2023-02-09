@@ -2,10 +2,7 @@ import sys
 import os
 import os.path as osp
 
-sys.path.append("..")
-sys.path.extend([os.path.join(root, name) for root, dirs, _ in os.walk("../") for name in dirs])
-
-from detection_models import *
+from .detection_models import SingleSide, LateFusion, EarlyFusion, VehOnly, InfOnly
 
 SUPPROTED_MODELS = {
     "single_side": SingleSide,

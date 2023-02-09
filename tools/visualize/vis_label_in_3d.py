@@ -218,6 +218,12 @@ if __name__ == "__main__":
     add_arguments(parser)
     args = parser.parse_args()
 
+    print(args)
+
+    #
+    # args.task='fusion'
+    # args.path='/workspace/mnt/storage/guangcongzheng/DAIR-V2X-C/cache/vic-late-lidar'
+    # args.id=0
     if args.task == "fusion":
         plot_pred_fusion(args)
 
